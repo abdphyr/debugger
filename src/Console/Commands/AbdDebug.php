@@ -15,27 +15,42 @@ use Symfony\Component\VarDumper\VarDumper;
 
 class AbdDebug extends Command
 {
-    protected $signature = "abd:debug";
+    protected $signature = "abd:debug {--class= : Controller name}";
 
     protected $description = 'Debug code';
 
-    // public function handle()
-    // {
-    //     dd("od");
-    //     $this->resolve();
-    // }
+    public function handle()
+    {
+        $this->resolve();
+    }
 
 
-    protected function resolve()
+    protected function controllers()
     {
         $namespace = 'App\Http\\Controllers';
         $path = app_path('Http/Controllers');
         $filter = function ($filename) {
+            $array = explode('.', $filename);
+            if ($controller = $this->option('class')) {
+                return $array[0] == $controller ? $filename : false;
+            }
             if (! str_starts_with($filename, 'Controller')) {
                 return true;
             }
         };
         $controllers = $this->getFiles(path: $path, namespace: $namespace, filter: $filter);
+        if (! $controllers && ($controller = $this->option('class'))) {
+            $this->info(yellow('Controller ') . white($controller) . yellow(' is not found.'));
+            die;
+        }
+        return $controllers;
+    }
+
+
+    protected function resolve()
+    {
+        $controllers = $this->controllers();
+        $this->newLine(1);
         foreach ($controllers as $controller) {
             $classname = pathinfo($controller, PATHINFO_FILENAME);
             $object = app()->make($classname);
@@ -44,7 +59,6 @@ class AbdDebug extends Command
                 // VarDumper::dump($reflectionController);
                 continue;
             }
-            $debugControllerAttrObj = $debugControllerAttr->newInstance();
             $reflectionMethods = $reflectionController->getMethods();
             foreach ($reflectionMethods as $reflectionMethod) {
                 if (! ($debugActionAttr = $this->isDebugAction($reflectionMethod))) {
@@ -160,7 +174,6 @@ class AbdDebug extends Command
 
                 app()->instance('request', $request);
 
-                $this->info(blue($reflectionController->getName()) . white('::') . yellow($reflectionMethod->getName() . '()'));
                 try {
                     $response = $reflectionMethod->invoke($object, ...$passedParameters);
                     if ($response instanceof \Illuminate\Contracts\Support\Responsable) {
@@ -172,15 +185,17 @@ class AbdDebug extends Command
                     } else if ($response instanceof \Illuminate\Support\Collection) {
                         $response = new JsonResponse(data: $response);
                     }
-                    $this->info(green('Ok: ') . red($response->getContent()));
+                    $this->info(gray('✅ '.$reflectionController->getName().'::'.$reflectionMethod->getName() . '()'));
+                    $this->info(white('Response: ') . gray($response->getContent()));
                 } catch (\Throwable $th) {
                     $message = $th->getMessage();
                     $file = $th->getFile();
                     $line = $th->getLine();
-                    $this->info(white('Error: ') . red($message));
-                    $this->info(white('Location: ') . yellow($file . ':' . $line));
+                    $this->info(gray('❌ ' . $reflectionController->getName() . '::'.$reflectionMethod->getName() . '()'));
+                    $this->info(white('Error: ') . gray($message));
+                    $this->info(white('Location: ') . gray($file . ':' . $line));
                 }
-                $this->newLine(2);
+                $this->newLine(1);
             }
         }
     }
@@ -195,7 +210,7 @@ class AbdDebug extends Command
         return $_SERVER;
     }
 
-    
+
     protected function getHttpMethod(ReflectionMethod $reflectionMethod, DebugActionAttr $debugActionAttrObj)
     {
         if ($debugActionAttrObj->getMethod()) {
@@ -229,7 +244,10 @@ class AbdDebug extends Command
                 $results = array_merge($results, $dirResults);
             } else {
                 if ($filter && $filter instanceof \Closure) {
-                    if ($filter($item)) {
+                    $result = $filter($item);
+                    if ($result && is_string($result)) {
+                        return [$namespace ? "$namespace\\$item" : $item];
+                    } else if ($result) {
                         $results[] = $namespace ? "$namespace\\$item" : $item;
                     }
                 } else {

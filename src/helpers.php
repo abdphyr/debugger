@@ -31,6 +31,21 @@ if (!function_exists('red')) {
         return "<fg=".__FUNCTION__.">$text</>";
     }
 }
+
+if (!function_exists('gray')) {
+    function gray(mixed $text)
+    {
+        return "<fg=".__FUNCTION__.">$text</>";
+    }
+}
+
+if (!function_exists('cyan')) {
+    function cyan(mixed $text)
+    {
+        return "<fg=".__FUNCTION__.">$text</>";
+    }
+}
+
 if (!function_exists('green')) {
     function green(mixed $text)
     {

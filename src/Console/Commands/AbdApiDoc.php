@@ -21,7 +21,7 @@ class AbdApiDoc extends Command
     const STR = "string";
     const BOO = "boolean";
 
-    protected $signature = "abd:api:doc {--folder= : Folder which generated files are saved} {--group= : Main file which urls are saved} {--debug}";
+    protected $signature = "abd:api:doc {--class= : Controller name} {--folder= : Folder which generated files are saved} {--group= : Main file which urls are saved} {--debug}";
     protected $description = 'Command description';
 
     protected string $folder = "swagger";
@@ -75,16 +75,31 @@ class AbdApiDoc extends Command
         return $group;
     }
 
-    protected function resolve()
+    protected function controllers()
     {
         $namespace = 'App\Http\\Controllers';
         $path = app_path('Http/Controllers');
         $filter = function ($filename) {
+            $array = explode('.', $filename);
+            if ($controller = $this->option('class')) {
+                return $array[0] == $controller ? $filename : false;
+            }
             if (! str_starts_with($filename, 'Controller')) {
                 return true;
             }
         };
         $controllers = $this->getFiles(path: $path, namespace: $namespace, filter: $filter);
+        if (! $controllers && ($controller = $this->option('class'))) {
+            $this->info(yellow('Controller ') . white($controller) . yellow(' is not found.'));
+            die;
+        }
+        return $controllers;
+    }
+
+
+    protected function resolve()
+    {
+        $controllers = $this->controllers();
         foreach ($controllers as $controller) {
             $classname = pathinfo($controller, PATHINFO_FILENAME);
             $object = app()->make($classname);
@@ -209,7 +224,7 @@ class AbdApiDoc extends Command
                 app()->instance('request', $request);
 
                 if ($this->option('debug')) {
-                    $this->info(blue($reflectionController->getName()) . white('::') . yellow($reflectionMethod->getName() . '()'));
+                    $this->newLine();
                     try {   
                         $response = $reflectionMethod->invoke($object, ...$passedParameters);
                         if ($response instanceof \Illuminate\Contracts\Support\Responsable) {
@@ -221,13 +236,15 @@ class AbdApiDoc extends Command
                         } else if ($response instanceof \Illuminate\Support\Collection) {
                             $response = new JsonResponse(data: $response);
                         }
-                        $this->info(green('Ok: ') . red($response->getContent()));
+                        $this->info(gray('✅ '.$reflectionController->getName()) . white('::') . yellow($reflectionMethod->getName() . '()'));
+                        $this->info(white('Ok: ') . red($response->getContent()));
                     } catch (\Throwable $th) {
                         $message = $th->getMessage();
                         $file = $th->getFile();
                         $line = $th->getLine();
-                        $this->info(white('Error: ') . red($message));
-                        $this->info(white('Location: ') . yellow($file . ':' . $line));
+                        $this->info(gray('❌ '.$reflectionController->getName()) . white('::') . yellow($reflectionMethod->getName() . '()'));
+                        $this->info(white('Error: ') . gray($message));
+                        $this->info(white('Location: ') . gray($file . ':' . $line));
                     }
                     $this->newLine(2);
                     continue;
@@ -237,11 +254,15 @@ class AbdApiDoc extends Command
                     try {
                         $response = $reflectionMethod->invoke($object, ...$passedParameters);
                     } catch (\Throwable $th) {
+                        $this->newLine();
                         $message = $th->getMessage();
                         $file = $th->getFile();
                         $line = $th->getLine();
-                        $this->comment($message . ' on ' . $file . ':' . $line);
-                        exit;
+                        $this->info(gray('❌ '.$reflectionController->getName()) . gray('::') . gray($reflectionMethod->getName() . '()'));
+                        $this->info(white('Error: ') . gray($message));
+                        $this->info(white('Location: ') . gray($file . ':' . $line));
+                        $this->newLine();
+                        continue;
                     }
                     if ($response instanceof \Illuminate\Contracts\Support\Responsable) {
                         $response = $response->toResponse($request ?? request());
@@ -266,7 +287,9 @@ class AbdApiDoc extends Command
                 $actionFilePath = $folder . '/' . $fileName;
                 $this->changeGroupFile($group, $endpoint, $folderName, $fileName);
                 $this->writeToDocFile($actionFilePath, $request, $response, $debugActionAttrObj);
+                $this->info(gray('✅ '.$reflectionController->getName()) . gray('::') . gray($reflectionMethod->getName() . '()'));
                 $this->info($actionFilePath);
+                $this->newLine();
             }
         }
     }
