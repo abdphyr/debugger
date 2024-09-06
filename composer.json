@@ -1,0 +1,25 @@
+{
+    "version": "0.0.1",
+    "name": "abdumannon/debugger",
+    "description": "This package helps to debug your code and making API documantation",
+    "autoload": {
+        "psr-4": {
+            "Abd\\Debugger\\": "src/"
+        }, 
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Abd\\Debugger\\DebuggerServiceProvider"
+            ]
+        }
+    },
+    "authors": [
+        {
+            "name": "Abdumannon Norboyev"
+        }
+    ]
+}
