@@ -68,8 +68,8 @@ class DebuggerServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                Console\Commands\DebugApp::class,
-                Console\Commands\SwaggerDoc::class,
+                Console\Commands\AbdDebug::class,
+                Console\Commands\AbdApiDoc::class,
             ]);
         }
     }
